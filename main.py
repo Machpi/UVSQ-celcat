@@ -1,11 +1,11 @@
+#!/usr/bin/env python3
 import sys
 import os
 from datetime import datetime
 from celcat2ics import run
 from room_availability import rooms_day_morning_evening, print_availability
 from fetch_rooms import get_rooms, write_rooms_cfg
-import msvcrt
-import ntpath
+import platform
 
 
 def clear():
@@ -13,13 +13,34 @@ def clear():
 
 
 def getch():
-    ch = msvcrt.getwch()
-    if ch == "\x03":
-        raise KeyboardInterrupt
-    if ch == "\x00" or ch == "\xe0":
-        ch2 = msvcrt.getwch()
-        return f"[{ord(ch2)}]"
-    return ch
+    if platform.system() == "Windows":
+        import msvcrt
+
+        ch = msvcrt.getwch()
+        if ch == "\x03":
+            raise KeyboardInterrupt
+        if ch == "\x00" or ch == "\xe0":
+            ch2 = msvcrt.getwch()
+            return f"[{ord(ch2)}]"
+        return ch
+    else:
+        import tty, termios
+
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(fd)
+            ch = sys.stdin.read(1)
+            if ch == "\x03":
+                raise KeyboardInterrupt
+            if ch == "\x1b":
+                next1 = sys.stdin.read(1)
+                if next1 == "[":
+                    next2 = sys.stdin.read(1)
+                    return f"\x1b[{next2}"
+            return ch
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 
 def select_menu(prompt, options, start_idx=0):
@@ -37,6 +58,7 @@ def select_menu(prompt, options, start_idx=0):
             idx = (idx + 1) % len(options)
         elif k in ("\r", "\n", "\x0d"):
             return options[idx]
+    clear()
 
 
 def cl_input(prompt):
@@ -63,7 +85,7 @@ def generate_ics():
         or default_cal_name
     )
 
-    base = ntpath.basename(cal_name)
+    base = os.path.basename(cal_name)
     if not base.lower().endswith(".ics"):
         base += ".ics"
     run(period, date, etype, earg, out_fname=base)
@@ -108,7 +130,7 @@ def generate_cfg():
         str_dept = str_dept.replace(" ", "_") or str_dept
         default_name = f"rooms_{str_dept}.txt"
     name = cl_input(f"Nom du fichier [{default_name}] : ").strip() or default_name
-    out_path = "configs/" + name
+    out_path = os.path.join(cfg_dir, name)
     filtered_rooms = []
     if chosen_dept == "Tous":
         filtered_rooms = rooms
@@ -167,6 +189,7 @@ def find_rooms():
         print("Aucune config trouvée.")
         sys.exit(1)
     info = rooms_day_morning_evening(date, rooms)
+    clear()
     print_availability(info)
     sys.exit(0)
 

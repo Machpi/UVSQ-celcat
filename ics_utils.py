@@ -4,7 +4,9 @@ from datetime import datetime, timezone
 import os
 
 
-def events_to_ics(events, out_path="/calendars/calendar.ics"):
+def events_to_ics(events, out_path=None):
+    if out_path is None:
+        out_path = os.path.join("calendars", "calendar.ics")
     buf = BytesIO()
 
     def fmt(dt):

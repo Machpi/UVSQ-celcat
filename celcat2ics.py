@@ -1,5 +1,6 @@
 import json
 import re
+import os
 from datetime import datetime, timezone, timedelta
 from ics_utils import events_to_ics
 
@@ -155,6 +156,6 @@ def run(period, date, entity_type, entity_arg, out_fname=None):
     events = calendar_json_to_events(data, federationIds)
 
     if not out_fname:
-        out_path = f"{entity_arg}-{period}_{date}.ics"
-    out_path = "calendars/" + out_fname
+        out_fname = f"{entity_arg}-{period}_{date}.ics"
+    out_path = os.path.join("calendars", out_fname)
     events_to_ics(events, out_path=out_path)
