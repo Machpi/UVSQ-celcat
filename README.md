@@ -4,7 +4,7 @@ Scripts en lien avec edt.uvsq.fr
 ## Scripts
 - Générer un fichier .ics à partir de celcat  
 Pour exporter son emploi du temps.
-- Récupérer des listes des salles  
+- Récupérer des listes de salles  
 Pour les étudiant.e.s en Licence/Master d'Informatique, sélectionner VER.
 - Vérifier la disponibilité d'une liste de salles  
 Ce dernier script affiche 𖤓/☾ pour matin/soir en rouge/vert pour occupé/disponible.
