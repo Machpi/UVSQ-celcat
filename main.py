@@ -3,7 +3,7 @@ import sys
 import os
 from datetime import datetime
 from celcat2ics import run
-from room_availability import rooms_day_morning_evening, print_availability
+from room_availability import pre_process, print_availability
 from fetch_rooms import get_rooms, write_rooms_cfg
 import platform
 
@@ -66,11 +66,24 @@ def cl_input(prompt):
     return input(prompt)
 
 
+def verify_date(date_str):
+    try:
+        date_obj = datetime.fromisoformat(date_str)
+        if date_obj.weekday() == 6:
+            print("Le campus est fermé le dimanche.")
+            sys.exit(1)
+        return date_obj
+    except ValueError:
+        print("Format de date invalide. Utilisez AAAA-MM-JJ.")
+        sys.exit(1)
+
+
 def generate_ics():
     period = select_menu("Période ", ["day", "week", "month", "year"])
     today = datetime.now().date().isoformat()
     date_input = cl_input(f"Date [{today}] : ").strip()
     date = date_input or today
+    verify_date(date)
     etype = select_menu("Type ", ["module", "room", "group"], start_idx=2)
     default_args = {
         "group": "M2 Secrets",
@@ -154,23 +167,7 @@ def find_rooms():
     today = datetime.now().date().isoformat()
     date_input = cl_input(f"Date [{today}] : ").strip()
     date = date_input or today
-
-    def load_default_rooms(path="config.txt"):
-        if not os.path.exists(path):
-            return []
-        with open(path, "r", encoding="utf-8") as fh:
-            txt = fh.read()
-        parts = []
-        for line in txt.splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            for seg in line.split(","):
-                s = seg.strip()
-                if s:
-                    parts.append(s)
-        return parts
-
+    verify_date(date)
     cfg_dir = "configs"
     rooms = []
     cfg_files = [
@@ -181,16 +178,15 @@ def find_rooms():
         sys.exit(1)
     choice = select_menu("Choisir une config", cfg_files)
     cfg_path = os.path.join(cfg_dir, choice)
-    rooms = load_default_rooms(cfg_path)
-    if not rooms:
+    if not os.path.exists(cfg_path):
+        print(f"Le fichier '{choice}' n'existe pas.")
+        sys.exit(1)
+    (rooms, max_len) = pre_process(cfg_path)
+    if rooms == 0:
         print(f"La config '{choice}' est vide ou invalide.")
         sys.exit(1)
-    if not rooms:
-        print("Aucune config trouvée.")
-        sys.exit(1)
-    info = rooms_day_morning_evening(date, rooms)
     clear()
-    print_availability(info)
+    print_availability(date, cfg_path, max_len)
     sys.exit(0)
 
 
