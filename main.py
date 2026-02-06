@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Module principal pour choisir un script."""
+
 import os
 import platform
 import sys
@@ -10,7 +11,7 @@ from fetch_rooms import get_rooms, write_rooms_cfg
 
 # Platform-specific imports
 if platform.system() == "Windows":
-    import msvcrt   # pylint: disable=import-error
+    import msvcrt  # pylint: disable=import-error
 else:
     import tty
     import termios  # pylint: disable=import-error
@@ -83,6 +84,19 @@ def verify_date(date_str):
         return date_obj
     except ValueError:
         print("Format de date invalide (AAAA-MM-JJ).")
+        sys.exit(1)
+
+
+def verify_time(time_str):
+    """Vérifie la validité d'une heure (format et pas après 18h40)."""
+    try:
+        time_obj = datetime.strptime(time_str, "%H:%M").time()
+        if time_obj > datetime.strptime("18:40", "%H:%M").time():
+            print("Le campus est fermé après 18h40.")
+            sys.exit(1)
+        return time_obj
+    except ValueError:
+        print("Format d'heure invalide (HH:MM).")
         sys.exit(1)
 
 
@@ -182,12 +196,18 @@ def generate_cfg():
     sys.exit(0)
 
 
-def find_rooms():
-    """Interface interactive pour trouver des salles libres."""
+def rooms_availability(mode):
+    """Interface interactive pour afficher la disponibilité des salles."""
     today = datetime.now().date().isoformat()
     date_input = cl_input(f"Date [{today}] : ").strip()
     date = date_input or today
     verify_date(date)
+    if mode == 1:
+        time_input = cl_input(
+            f"Heure [{datetime.now().time().strftime('%H:%M')}] : "
+        ).strip()
+        time = time_input or datetime.now().time().strftime("%H:%M")
+        verify_time(time)
     cfg_dir = "configs"
     rooms = []
     cfg_files = [
@@ -206,7 +226,10 @@ def find_rooms():
         print(f"La config '{choice}' est vide ou invalide.")
         sys.exit(1)
     clear()
-    print_availability(date, cfg_path, max_len)
+    if mode == 1:
+        print_availability(date, cfg_path, max_len, mode, time=time)
+    else:
+        print_availability(date, cfg_path, max_len, mode)
     sys.exit(0)
 
 
@@ -215,7 +238,8 @@ def interactive_menu():
     options = [
         "Générer un .ics",
         "Générer un fichier de config",
-        "Trouver des salles libres",
+        "Disponibilité des salles (matin/après-midi)",
+        "Trouver une salle libre",
         "Quitter",
     ]
     idx = 0
@@ -236,12 +260,14 @@ def interactive_menu():
                     generate_ics()
                 elif choice.startswith("Générer"):
                     generate_cfg()
+                elif choice.startswith("Disponibilité"):
+                    rooms_availability(mode=0)
                 elif choice.startswith("Trouver"):
-                    find_rooms()
+                    rooms_availability(mode=1)
                 else:
                     break
     except KeyboardInterrupt:
-        clear()
+        pass
 
 
 if __name__ == "__main__":

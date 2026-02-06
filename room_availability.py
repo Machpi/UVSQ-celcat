@@ -15,13 +15,13 @@ def single_room_availability(date_str, room):
     d = datetime.fromisoformat(date_str).date()
     dn = d + timedelta(days=1)
 
-    federation_ids = [room]
-    data = post_calendar(
-        d.isoformat(), dn.isoformat(), 102, "agendaDay", federation_ids
-    )
+    data = post_calendar(d.isoformat(), dn.isoformat(), 102, "agendaDay", [room])
     events = []
+    morning_busy = False
+    afternoon_busy = False
+
     if isinstance(data, list) and data:
-        events = calendar_json_to_events(data, federation_ids)
+        events = calendar_json_to_events(data, [room])
         for ev in events:
             s = ev.get("start")
             e = ev.get("end")
@@ -30,24 +30,61 @@ def single_room_availability(date_str, room):
             s_local = s.astimezone(tz)
             e_local = e.astimezone(tz)
 
-            return (
-                overlaps(
-                    s_local,
-                    e_local,
-                    datetime(d.year, d.month, d.day, 8, 0, tzinfo=tz),
-                    datetime(d.year, d.month, d.day, 13, 0, tzinfo=tz),
-                ),
-                overlaps(
-                    s_local,
-                    e_local,
-                    datetime(d.year, d.month, d.day, 13, 0, tzinfo=tz),
-                    datetime(d.year, d.month, d.day, 18, 0, tzinfo=tz),
-                ),
+            morning_busy = morning_busy or overlaps(
+                s_local,
+                e_local,
+                datetime(d.year, d.month, d.day, 8, 0, tzinfo=tz),
+                datetime(d.year, d.month, d.day, 13, 0, tzinfo=tz),
             )
-    return (False, False)
+
+            afternoon_busy = afternoon_busy or overlaps(
+                s_local,
+                e_local,
+                datetime(d.year, d.month, d.day, 13, 0, tzinfo=tz),
+                datetime(d.year, d.month, d.day, 18, 0, tzinfo=tz),
+            )
+    return (morning_busy, afternoon_busy)
 
 
-def _colored_icon(icon: str, is_busy: bool):
+def single_room_availability_at_time(date_str, time_str, room):
+    """Vérifie si une salle est disponible, et jusqu'à quelle heure."""
+    tz = timezone.utc
+    d = datetime.fromisoformat(date_str).date()
+    t = datetime.strptime(time_str, "%H:%M").time()
+    dt = datetime.combine(d, t, tzinfo=tz)
+    data = post_calendar(
+        d.isoformat(),
+        (d + timedelta(days=1)).isoformat(),
+        102,
+        "agendaDay",
+        [room],
+    )
+
+    next_event_start = None
+
+    if isinstance(data, list) and data:
+        events = calendar_json_to_events(data, [room])
+        for ev in events:
+            s = ev.get("start")
+            e = ev.get("end")
+            if not s or not e:
+                continue
+            s_local = s.astimezone(tz)
+            e_local = e.astimezone(tz)
+
+            if s_local <= dt < e_local:
+                return (False, e_local.time().strftime("%H:%M"))
+
+            if dt < s_local < datetime(d.year, d.month, d.day, 18, 40, tzinfo=tz):
+                if next_event_start is None or s_local < next_event_start:
+                    next_event_start = s_local
+
+    if next_event_start is not None:
+        return (True, next_event_start.time().strftime("%H:%M"))
+    return (True, "18:40")
+
+
+def colored_icon(icon: str, is_busy: bool):
     """Retourne une icône colorée selon la disponibilité."""
     green = "\x1b[32m"
     red = "\x1b[31m"
@@ -85,7 +122,7 @@ def pre_process(cfg):
     return rooms, max_len
 
 
-def print_availability(date, cfg, max_len):
+def print_availability(date, cfg, max_len, mode, time=None):
     """Affiche la disponibilité de toutes les salles du fichier de config."""
     with open(cfg, "r", encoding="utf-8") as f:
         for line in f:
@@ -99,8 +136,23 @@ def print_availability(date, cfg, max_len):
             if line.startswith("#"):
                 title(line[1:].strip(), max_len)
                 continue
-            (morning_busy, evening_busy) = single_room_availability(date, line)
-            sun = _colored_icon("𖤓", morning_busy)
-            moon = _colored_icon("☾", evening_busy)
-            name_aligned = line.rstrip("\n").ljust(max_len)
-            print(f"{name_aligned}  {sun}{moon}")
+            if mode == 0:
+                (morning_busy, evening_busy) = single_room_availability(date, line)
+                sun = colored_icon("𖤓", morning_busy)
+                moon = colored_icon("☾", evening_busy)
+                name_aligned = line.rstrip("\n").ljust(max_len)
+                print(f"{name_aligned}  {sun}{moon}")
+            else:
+                (is_available, until_time) = single_room_availability_at_time(
+                    date, time, line
+                )
+                icon = (
+                    colored_icon("✓", not is_available)
+                    if is_available
+                    else colored_icon("✘", not is_available)
+                )
+                name_aligned = line.rstrip("\n").ljust(max_len)
+                if is_available:
+                    print(f"{name_aligned}  {icon} Disponible jusqu'à {until_time}")
+                else:
+                    print(f"{name_aligned}  {icon} Occupée jusqu'à {until_time}")
