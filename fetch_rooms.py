@@ -30,9 +30,9 @@ def get_rooms():
             data_list = data[key]
             break
     for item in data_list:
-        id = item.get("id")
+        item_id = item.get("id")
         name = item.get("name")
-        results.append({"id": id, "name": name or str(item), "raw": item})
+        results.append({"id": item_id, "name": name or str(item), "raw": item})
     return results
 
 

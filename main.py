@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
-import sys
 import os
+import platform
+import sys
 from datetime import datetime
 from celcat2ics import run
 from room_availability import pre_process, print_availability
 from fetch_rooms import get_rooms, write_rooms_cfg
-import platform
+
+# Platform-specific imports
+if platform.system() == "Windows":
+    import msvcrt
+else:
+    import tty
+    import termios
 
 
 def clear():
@@ -14,18 +21,13 @@ def clear():
 
 def getch():
     if platform.system() == "Windows":
-        import msvcrt
-
         ch = msvcrt.getwch()
         if ch == "\x03":
             raise KeyboardInterrupt
-        if ch == "\x00" or ch == "\xe0":
+        if ch in ("\x00", "\xe0"):
             ch2 = msvcrt.getwch()
             return f"[{ord(ch2)}]"
-        return ch
     else:
-        import tty, termios
-
         fd = sys.stdin.fileno()
         old_settings = termios.tcgetattr(fd)
         try:
@@ -38,9 +40,9 @@ def getch():
                 if next1 == "[":
                     next2 = sys.stdin.read(1)
                     return f"\x1b[{next2}"
-            return ch
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+    return ch
 
 
 def select_menu(prompt, options, start_idx=0):

@@ -11,20 +11,13 @@ def single_room_availability(date_str, room):
     d = datetime.fromisoformat(date_str).date()
     dn = d + timedelta(days=1)
 
-    m_start = datetime(d.year, d.month, d.day, 8, 0, tzinfo=tz)
-    m_end = datetime(d.year, d.month, d.day, 13, 0, tzinfo=tz)
-    e_start = datetime(d.year, d.month, d.day, 13, 0, tzinfo=tz)
-    e_end = datetime(d.year, d.month, d.day, 18, 0, tzinfo=tz)
-
-    resType = 102
-    calView = "agendaDay"
-    federationIds = [room]
-    data = post_calendar(d.isoformat(), dn.isoformat(), resType, calView, federationIds)
-    morning_busy = False
-    evening_busy = False
+    federation_ids = [room]
+    data = post_calendar(
+        d.isoformat(), dn.isoformat(), 102, "agendaDay", federation_ids
+    )
     events = []
     if isinstance(data, list) and data:
-        events = calendar_json_to_events(data, federationIds)
+        events = calendar_json_to_events(data, federation_ids)
         for ev in events:
             s = ev.get("start")
             e = ev.get("end")
@@ -33,61 +26,72 @@ def single_room_availability(date_str, room):
             s_local = s.astimezone(tz)
             e_local = e.astimezone(tz)
 
-            if overlaps(s_local, e_local, m_start, m_end):
-                morning_busy = True
-            if overlaps(s_local, e_local, e_start, e_end):
-                evening_busy = True
-    return (morning_busy, evening_busy)
+            return (
+                overlaps(
+                    s_local,
+                    e_local,
+                    datetime(d.year, d.month, d.day, 8, 0, tzinfo=tz),
+                    datetime(d.year, d.month, d.day, 13, 0, tzinfo=tz),
+                ),
+                overlaps(
+                    s_local,
+                    e_local,
+                    datetime(d.year, d.month, d.day, 13, 0, tzinfo=tz),
+                    datetime(d.year, d.month, d.day, 18, 0, tzinfo=tz),
+                ),
+            )
+    return (False, False)
 
 
 def _colored_icon(icon: str, is_busy: bool):
-    GREEN = "\x1b[32m"
-    RED = "\x1b[31m"
-    RESET = "\x1b[0m"
-    return f"{GREEN}{icon}{RESET}  " if not is_busy else f"{RED}{icon}{RESET}  "
+    green = "\x1b[32m"
+    red = "\x1b[31m"
+    reset = "\x1b[0m"
+    return f"{green}{icon}{reset}  " if not is_busy else f"{red}{icon}{reset}  "
 
 
 def subtitle(text, max_len):
-    UNDERLINE = "\x1b[4m"
-    RESET = "\x1b[0m"
+    underline = "\x1b[4m"
+    reset = "\x1b[0m"
     spaces = " " * ((max_len + 6 - len(text)) // 2)
-    print(f"{spaces}{UNDERLINE}{text}{RESET}{spaces}")
+    print(f"{spaces}{underline}{text}{reset}{spaces}")
 
 
 def title(text, max_len):
-    BOLD = "\x1b[1m"
-    UNDERLINE = "\x1b[4m"
-    RESET = "\x1b[0m"
+    bold = "\x1b[1m"
+    underline = "\x1b[4m"
+    reset = "\x1b[0m"
     spaces = " " * ((max_len + 6 - len(text)) // 2)
-    print(f"{BOLD}{UNDERLINE}{spaces}{text}{spaces}{RESET}")
+    print(f"{bold}{underline}{spaces}{text}{spaces}{reset}")
 
 
 def pre_process(cfg):
     rooms = []
     max_len = 0
-    for line in open(cfg, "r", encoding="utf-8"):
-        if not line or line.startswith("#"):
-            continue
-        rooms.append(line)
-        if len(line) > max_len:
-            max_len = len(line)
+    with open(cfg, "r", encoding="utf-8") as f:
+        for line in f:
+            if not line or line.startswith("#"):
+                continue
+            rooms.append(line)
+            max_len = max(max_len, len(line.rstrip("\n")))
     return rooms, max_len
 
 
 def print_availability(date, cfg, max_len):
-    for line in open(cfg, "r", encoding="utf-8"):
-        line = line.rstrip("\n")
-        if line == "":
-            print()
-            continue
-        if line.startswith("##"):
-            subtitle(line[2:].strip(), max_len)
-            continue
-        if line.startswith("#"):
-            title(line[1:].strip(), max_len)
-            continue
-        (morning_busy, evening_busy) = single_room_availability(date, line)
-        sun = _colored_icon("𖤓", morning_busy)
-        moon = _colored_icon("☾", evening_busy)
-        name_aligned = line.rstrip("\n").ljust(max_len)
-        print(f"{name_aligned}  {sun}{moon}")
+    with open(cfg, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.rstrip("\n")
+            if line == "":
+                print()
+                continue
+            if line.startswith("##"):
+                subtitle(line[2:].strip(), max_len)
+                continue
+            if line.startswith("#"):
+                title(line[1:].strip(), max_len)
+                continue
+            (morning_busy, evening_busy) = single_room_availability(date, line)
+            sun = _colored_icon("𖤓", morning_busy)
+            moon = _colored_icon("☾", evening_busy)
+            name_aligned = line.rstrip("\n").ljust(max_len)
+            print(f"{name_aligned}  {sun}{moon}")
