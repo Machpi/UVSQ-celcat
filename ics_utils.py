@@ -1,16 +1,21 @@
+"""Module utilitaire pour générer des fichiers ICS."""
+
 from io import BytesIO
 import uuid
 from datetime import datetime, timezone
 import os
 
 
+def fmt(dt):
+    """Formate un datetime au format ICS."""
+    return dt.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
 def events_to_ics(events, out_path=None):
+    """Convertit une liste d'événements en fichier ICS."""
     if out_path is None:
         out_path = os.path.join("calendars", "calendar.ics")
     buf = BytesIO()
-
-    def fmt(dt):
-        return dt.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
     buf.write("BEGIN:VCALENDAR\n".encode("utf-8"))
     buf.write("VERSION:2.0\n".encode("utf-8"))

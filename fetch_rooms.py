@@ -1,8 +1,11 @@
+"""Module pour récupérer et écrire les salles depuis l'API CELCAT."""
+
 from typing import List, Dict
 import requests
 
 
 def get_rooms():
+    """Récupère la liste des salles disponibles depuis l'API CELCAT."""
     session = requests.Session()
     url = "https://edt.uvsq.fr/Home/ReadResourceListItems"
     params = {
@@ -37,6 +40,7 @@ def get_rooms():
 
 
 def write_rooms_cfg(rooms, out_path):
+    """Ecrit les IDs des salles dans un fichier de configuration."""
     with open(out_path, "w", encoding="utf-8") as fh:
         for r in rooms:
             line = str(r.get("id"))

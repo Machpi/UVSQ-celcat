@@ -1,3 +1,8 @@
+"""Module pour convertir les calendriers CELCAT en fichiers ICS.
+Ce module récupère les données de calendrier depuis l'EDT UVSQ CELCAT
+et les convertit en fichiers .ics lisibles par les applications de calendrier.
+"""
+
 import json
 import re
 import os
@@ -9,6 +14,7 @@ from ics_utils import events_to_ics
 
 
 def post_calendar(start, end, res_type, cal_view, federation_ids):
+    """Récupère les données de calendrier depuis l'API CELCAT."""
     data = []
     data.append(("start", start))
     data.append(("end", end))
@@ -35,16 +41,18 @@ def post_calendar(start, end, res_type, cal_view, federation_ids):
         return json.loads(text)
 
 
-def calendar_json_to_events(json_list, federation_ids=None):
-    evts = []
+def to_utc(dt_str):
+    """Convertit une chaîne de date en datetime UTC."""
     tz = timezone.utc
+    dt = datetime.fromisoformat(dt_str)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=tz)
+    return dt.astimezone(timezone.utc)
 
-    def to_utc(dt_str):
-        dt = datetime.fromisoformat(dt_str)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=tz)
-        return dt.astimezone(timezone.utc)
 
+def calendar_json_to_events(json_list, federation_ids=None):
+    """Convertit les données JSON de CELCAT en structure d'événements."""
+    evts = []
     for item in json_list:
         modules = item.get("modules") or []
         group = None
@@ -83,6 +91,7 @@ def calendar_json_to_events(json_list, federation_ids=None):
 
 
 def compute_range(period, date_str):
+    """Calcule les dates de début et fin selon la période."""
     d = datetime.fromisoformat(date_str)
     if period == "day":
         start = d.date()
@@ -101,6 +110,7 @@ def compute_range(period, date_str):
 
 
 def month_start_end(y, m):
+    """Retourne le premier et dernier jour d'un mois."""
     first = f"{y:04d}-{m:02d}-01"
     last_day = calendar.monthrange(y, m)[1]
     last = f"{y:04d}-{m:02d}-{last_day:02d}"
@@ -108,6 +118,7 @@ def month_start_end(y, m):
 
 
 def fetch_year(date_str, res_type, federation_ids):
+    """Récupère les événements de l'année universitaire complète."""
     d = datetime.fromisoformat(date_str)
     start_year = d.year if d.month >= 9 else d.year - 1
     months = list(range(9, 13)) + list(range(1, 9))
@@ -125,6 +136,7 @@ def fetch_year(date_str, res_type, federation_ids):
 
 
 def run(period, date, entity_type, entity_arg, out_fname=None):
+    """Génère un fichier ICS depuis CELCAT pour une période donnée."""
     period_to_view = {
         "day": "agendaDay",
         "week": "agendaWeek",
